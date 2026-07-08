@@ -195,6 +195,7 @@
         <div class="frow qcond noprint" id="q-range"><label class="lbl">기간</label><input type="date" id="qFrom" value="2024-07-01"> ~ <input type="date" id="qTo" value="2024-07-31"><span class="hint">기존 입출항시간 기준</span></div>
         <div class="frow noprint"><label class="lbl">검색</label><input type="text" id="listSearch" placeholder="모선명 또는 사유로 검색" oninput="runQuery()" style="width:300px"><span class="hint">전체 기간에서 모선명·사유 검색</span></div>
         <div style="overflow-x:auto"><table class="grid mini" id="manageTable"></table></div>
+        <div id="manageMore" class="noprint" style="text-align:center;margin-top:12px"></div>
         <div style="margin-top:12px" class="noprint">
           <button class="btn ghost" onclick="loadSample()">엑셀 예시 15건 불러오기</button>
           <button class="btn ghost" onclick="clearAll()">전체 삭제</button>
@@ -463,12 +464,31 @@ function renderHome(){
   setKpi('k-sd',c.sd,p.sd,'h');
   setKpi('k-gm',c.gm,p.gm,'h');
 }
+let MANAGE_ROWS=[], MANAGE_SHOWN=10;   /* 조회 목록 페이지네이션 */
+const MANAGE_STEP=10;
 function renderManageRows(rows){
-  const el=document.getElementById('manageTable');if(!el)return;
-  const a=rows.slice().reverse();
-  const cb=document.getElementById('manageCnt');if(cb)cb.textContent='(조회 '+a.length+'건)';
-  el.innerHTML=recentRows(a);
+  MANAGE_ROWS=rows.slice().reverse();   /* 최신순 */
+  MANAGE_SHOWN=MANAGE_STEP;
+  paintManage();
 }
+function paintManage(){
+  const el=document.getElementById('manageTable');if(!el)return;
+  const total=MANAGE_ROWS.length, shown=Math.min(MANAGE_SHOWN,total);
+  const cb=document.getElementById('manageCnt');if(cb)cb.textContent=total?('(총 '+total+'건 중 '+shown+'건 표시)'):'(0건)';
+  el.innerHTML=recentRows(MANAGE_ROWS.slice(0,MANAGE_SHOWN));
+  const more=document.getElementById('manageMore');
+  if(more){
+    if(total>MANAGE_SHOWN){
+      const remain=total-MANAGE_SHOWN;
+      more.innerHTML='<button class="btn q" onclick="moreManage()">▼ 더보기 ('+Math.min(MANAGE_STEP,remain)+'개 더 · 남은 '+remain+'건)</button> <button class="btn ghost" onclick="allManage()">전체 펼치기</button>';
+    }else if(total>MANAGE_STEP){
+      more.innerHTML='<button class="btn ghost" onclick="collapseManage()">▲ 접기</button>';
+    }else more.innerHTML='';
+  }
+}
+function moreManage(){MANAGE_SHOWN+=MANAGE_STEP;paintManage();}
+function allManage(){MANAGE_SHOWN=MANAGE_ROWS.length;paintManage();}
+function collapseManage(){MANAGE_SHOWN=MANAGE_STEP;paintManage();}
 /* 홈 통합 갱신: KPI + 조회(리스트) */
 function refreshHome(){renderHome();runQuery();}
 
