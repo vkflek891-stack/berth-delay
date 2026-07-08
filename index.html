@@ -195,6 +195,7 @@
         <div class="frow qcond noprint" id="q-month"><label class="lbl">년월</label><input type="month" id="qMonth" value="2024-07"></div>
         <div class="frow qcond noprint" id="q-range"><label class="lbl">기간</label><input type="date" id="qFrom" value="2024-07-01"> ~ <input type="date" id="qTo" value="2024-07-31"><span class="hint">기존 입출항시간 기준</span></div>
         <div class="frow noprint"><label class="lbl">검색</label><input type="text" id="listSearch" placeholder="모선명 또는 사유로 검색" oninput="runQuery()" style="width:300px"><span class="hint">전체 기간에서 모선명·사유 검색</span></div>
+        <div class="frow noprint"><label class="lbl">월 바로가기</label><select id="quickMonth" onchange="quickMonthFilter()" style="padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:inherit"></select><span class="hint">년월별 라디오 선택 없이 그 달만 바로 보기</span></div>
         <div style="overflow-x:auto"><table class="grid mini" id="manageTable"></table></div>
         <div id="manageMore" class="noprint" style="text-align:center;margin-top:12px"></div>
         <div style="margin-top:12px" class="noprint">
@@ -297,10 +298,14 @@
       <div class="card"><h3>기간별 지연시간 · 발생 건수 (숫자)</h3><div class="cbody" style="overflow-x:auto">
         <table class="grid" id="scPeriodTable"></table>
         <div id="scPeriodMore" style="text-align:center;margin-top:10px"></div></div></div>
-      <div class="card"><h3>사유별 지연시간 (h)</h3><div class="cbody" style="overflow-x:auto"><div id="scReasonH" class="chartsm"></div></div></div>
-      <div class="card"><h3>사유별 비중 (건수)</h3><div class="cbody" style="overflow-x:auto"><div id="scReasonPie" class="chartsm"></div></div></div>
-      <div class="card"><h3>터미널별 지연시간 (입/출항 누적) <span style="font-weight:400;font-size:12px;color:#8d99ae">— 전체 자료 기준</span></h3><div class="cbody" style="overflow-x:auto"><div id="scTermIO" class="chartsm"></div></div></div>
-      <div class="card"><h3>입항 vs 출항 (h) <span style="font-weight:400;font-size:12px;color:#8d99ae">— 전체 자료 기준</span></h3><div class="cbody" style="overflow-x:auto"><div id="scIO" class="chartsm"></div></div></div>
+      <div class="card"><h3>사유별 분석</h3><div class="cbody"><div class="flex">
+        <div class="chartbox"><h4>사유별 지연시간 (h)</h4><div id="scReasonH" class="chartsm"></div></div>
+        <div class="chartbox"><h4>사유별 비중 (건수)</h4><div id="scReasonPie" class="chartsm"></div></div>
+      </div></div></div>
+      <div class="card"><h3>터미널 · 입출항 개요 <span style="font-weight:400;font-size:12px;color:#8d99ae">— 전체 자료 기준</span></h3><div class="cbody"><div class="flex">
+        <div class="chartbox"><h4>터미널별 지연시간 (입/출항 누적)</h4><div id="scTermIO" class="chartsm"></div></div>
+        <div class="chartbox"><h4>입항 vs 출항 (h)</h4><div id="scIO" class="chartsm"></div></div>
+      </div></div></div>
     </section>
 
     <!-- ===== 지연사유서 (출력 전용) ===== -->
@@ -472,6 +477,21 @@ function renderManageRows(rows){
   MANAGE_ROWS=rows.slice().reverse();   /* 최신순 */
   MANAGE_SHOWN=MANAGE_STEP;
   paintManage();
+  populateQuickMonth();
+}
+/* 표 상단 '월 바로가기' — 데이터에 있는 월 목록으로 채우고, 현재 조회 월과 동기화 */
+function populateQuickMonth(){
+  const sel=document.getElementById('quickMonth');if(!sel)return;
+  const months=[...new Set(load().map(r=>r.ym).filter(Boolean))].sort().reverse();
+  const qt=(document.querySelector('input[name=qtype]:checked')||{}).value;
+  const cur=(qt==='month')?(document.getElementById('qMonth').value||''):'';
+  sel.innerHTML='<option value="">— 전체 월 —</option>'+months.map(m=>`<option value="${m}">${m}</option>`).join('');
+  sel.value=cur;
+}
+function quickMonthFilter(){
+  const v=document.getElementById('quickMonth').value;
+  if(!v){const rb=document.querySelector('input[name=qtype][value="all"]');if(rb)rb.checked=true;switchQ();runQuery();}
+  else filterByYm(v);
 }
 function paintManage(){
   const el=document.getElementById('manageTable');if(!el)return;
@@ -480,12 +500,10 @@ function paintManage(){
   el.innerHTML=recentRows(MANAGE_ROWS.slice(0,MANAGE_SHOWN));
   const more=document.getElementById('manageMore');
   if(more){
-    if(total>MANAGE_SHOWN){
-      const remain=total-MANAGE_SHOWN;
-      more.innerHTML='<button class="btn q" onclick="moreManage()">▼ 더보기 ('+Math.min(MANAGE_STEP,remain)+'개 더 · 남은 '+remain+'건)</button> <button class="btn ghost" onclick="allManage()">전체 펼치기</button>';
-    }else if(total>MANAGE_STEP){
-      more.innerHTML='<button class="btn ghost" onclick="collapseManage()">▲ 접기</button>';
-    }else more.innerHTML='';
+    const eff=Math.min(MANAGE_SHOWN,total);let b='';
+    if(total>MANAGE_SHOWN){const remain=total-MANAGE_SHOWN;b+='<button class="btn q" onclick="moreManage()">▼ 더보기 ('+Math.min(MANAGE_STEP,remain)+'개 더 · 남은 '+remain+'건)</button> <button class="btn ghost" onclick="allManage()">전체 펼치기</button>';}
+    if(eff>MANAGE_STEP)b+=(b?' ':'')+'<button class="btn ghost" onclick="collapseManage()">▲ 접기</button>';
+    more.innerHTML=b;
   }
 }
 function moreManage(){MANAGE_SHOWN+=MANAGE_STEP;paintManage();}
@@ -590,10 +608,10 @@ function paintPeriod(){
     h+=`<tr class="bpt"><td>합계(전체)</td><td>${STAT_TOT}</td><td>${STAT_CNT}</td></tr>`;}
   pt.innerHTML=h;
   const more=document.getElementById('scPeriodMore');if(!more)return;
-  const total=STAT_PK.length;
-  if(total>STAT_SHOWN){const remain=total-STAT_SHOWN;more.innerHTML='<button class="btn q" onclick="morePeriod()">▼ 더보기 ('+Math.min(STAT_STEP,remain)+'개 더 · 남은 '+remain+')</button> <button class="btn ghost" onclick="allPeriod()">전체 펼치기</button>';}
-  else if(total>STAT_STEP){more.innerHTML='<button class="btn ghost" onclick="collapsePeriod()">▲ 접기</button>';}
-  else more.innerHTML='';
+  const total=STAT_PK.length,eff=Math.min(STAT_SHOWN,total);let b='';
+  if(total>STAT_SHOWN){const remain=total-STAT_SHOWN;b+='<button class="btn q" onclick="morePeriod()">▼ 더보기 ('+Math.min(STAT_STEP,remain)+'개 더 · 남은 '+remain+')</button> <button class="btn ghost" onclick="allPeriod()">전체 펼치기</button>';}
+  if(eff>STAT_STEP)b+=(b?' ':'')+'<button class="btn ghost" onclick="collapsePeriod()">▲ 접기</button>';
+  more.innerHTML=b;
 }
 function morePeriod(){STAT_SHOWN+=STAT_STEP;paintPeriod();}
 function allPeriod(){STAT_SHOWN=STAT_PK.length;paintPeriod();}
