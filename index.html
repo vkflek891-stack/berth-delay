@@ -150,9 +150,8 @@
       <a id="m-stats" onclick="go('stats')">📊 통계 분석</a>
     </nav>
     <div class="foot">
-      <div id="authStatus" style="margin-bottom:7px;line-height:1.5">🔒 비로그인 (조회 전용)</div>
-      <button class="btn ghost" id="authBtn" onclick="openLogin()" style="padding:6px 12px;font-size:12px;width:100%">로그인</button>
-      <div style="margin-top:8px;font-size:10px;color:#6b7a92">Supabase 공용 DB · v2.0</div>
+      <div style="line-height:1.5">🌐 공용 DB (로그인 없이)<br>누구나 조회·입력 가능</div>
+      <div style="margin-top:8px;font-size:10px;color:#6b7a92">Supabase 연동 · v2.1</div>
     </div>
   </aside>
 
@@ -319,16 +318,6 @@
   </main>
 </div>
 <div class="toast" id="toast"></div>
-<div id="loginModal" class="lmodal">
-  <div class="lbox">
-    <div class="ltitle">🔒 로그인</div>
-    <div class="lsub">입력·수정·삭제하려면 로그인하세요. 조회만 할 경우 필요 없습니다.</div>
-    <input id="loginEmail" type="email" placeholder="이메일" autocomplete="username">
-    <input id="loginPw" type="password" placeholder="비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
-    <div id="loginMsg" class="lmsg"></div>
-    <div class="lbtns"><button class="btn save" onclick="doLogin()">로그인</button><button class="btn ghost" onclick="closeLogin()">취소</button></div>
-  </div>
-</div>
 
 <script>
 const PIE=['#a7c8ec','#a9ddcf','#f3cf9c','#f2b0bd','#c9bfe6','#bcc8da'];
@@ -336,8 +325,6 @@ const PIE=['#a7c8ec','#a9ddcf','#f3cf9c','#f2b0bd','#c9bfe6','#bcc8da'];
 const SUPA_URL='https://yaucvdpqhkrmvzdajsaf.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdWN2ZHBxaGtybXZ6ZGFqc2FmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NDE3NTMsImV4cCI6MjA5OTAxNzc1M30.IF7rB11Ppz8C0FoEtIL2anmgiettopOgKBOFx6z4Fa0';
 const REST=SUPA_URL+'/rest/v1/berth_delays';
-const AUTHURL=SUPA_URL+'/auth/v1';
-let TOKEN=null;   // 로그인 액세스 토큰
 let DATA=[];      // 서버 자료 캐시 (기존 코드가 load()로 접근)
 function load(){return DATA;}
 /* 앱 객체(camelCase) ↔ DB 컬럼(snake_case) 매핑 */
@@ -349,48 +336,17 @@ async function fetchAll(){
   catch(e){toast('네트워크 오류 — 인터넷 연결 확인');}
 }
 async function apiWrite(method,url,body){
-  if(!TOKEN){toast('로그인이 필요합니다');openLogin();return false;}
-  const opt=()=>{const o={method,headers:{apikey:SUPA_KEY,Authorization:'Bearer '+TOKEN,'Content-Type':'application/json',Prefer:'return=minimal'}};if(body!==undefined)o.body=JSON.stringify(body);return o;};
-  let r;try{r=await fetch(url,opt());}catch(e){toast('네트워크 오류');return false;}
-  if(r.status===401){if(await refreshToken()){try{r=await fetch(url,opt());}catch(e){return false;}}}
-  if(!r.ok){const t=await r.text().catch(()=>'');console.error('write fail',r.status,t);toast('처리 실패 '+r.status);if(r.status===401){logout();openLogin();}return false;}
+  const opt={method,headers:{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY,'Content-Type':'application/json',Prefer:'return=minimal'}};
+  if(body!==undefined)opt.body=JSON.stringify(body);
+  let r;try{r=await fetch(url,opt);}catch(e){toast('네트워크 오류 — 인터넷 확인');return false;}
+  if(!r.ok){const t=await r.text().catch(()=>'');console.error('write fail',r.status,t);toast('처리 실패 '+r.status);return false;}
   return true;
 }
 function dbInsert(rec){return apiWrite('POST',REST,Array.isArray(rec)?rec.map(toDb):toDb(rec));}
 function dbUpdate(rec){return apiWrite('PATCH',REST+'?id=eq.'+encodeURIComponent(rec.id),toDb(rec));}
 function dbDelete(id){return apiWrite('DELETE',REST+'?id=eq.'+encodeURIComponent(id));}
 function dbDeleteAll(){return apiWrite('DELETE',REST+'?id=not.is.null');}
-/* ===== 인증 (로그인/토큰) ===== */
-async function login(email,pw){
-  try{const r=await fetch(AUTHURL+'/token?grant_type=password',{method:'POST',headers:{apikey:SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})});
-    const j=await r.json();if(!r.ok||!j.access_token)return false;
-    TOKEN=j.access_token;localStorage.setItem('berth_auth',JSON.stringify({access:j.access_token,refresh:j.refresh_token,email}));return true;}
-  catch(e){return false;}
-}
-async function refreshToken(){
-  let s;try{s=JSON.parse(localStorage.getItem('berth_auth')||'null');}catch(e){s=null;}
-  if(!s||!s.refresh){TOKEN=null;return false;}
-  try{const r=await fetch(AUTHURL+'/token?grant_type=refresh_token',{method:'POST',headers:{apikey:SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:s.refresh})});
-    const j=await r.json();if(!r.ok||!j.access_token){TOKEN=null;localStorage.removeItem('berth_auth');return false;}
-    TOKEN=j.access_token;localStorage.setItem('berth_auth',JSON.stringify({access:j.access_token,refresh:j.refresh_token,email:s.email}));return true;}
-  catch(e){return false;}
-}
-function logout(){TOKEN=null;localStorage.removeItem('berth_auth');updateAuthUI();}
-function authEmail(){try{return (JSON.parse(localStorage.getItem('berth_auth')||'{}').email)||'';}catch(e){return '';}}
-function updateAuthUI(){
-  const st=document.getElementById('authStatus'),btn=document.getElementById('authBtn');if(!st||!btn)return;
-  if(TOKEN){st.innerHTML='🟢 로그인: <b>'+authEmail()+'</b><br>입력·수정·삭제 가능';btn.textContent='로그아웃';btn.onclick=function(){logout();toast('로그아웃되었습니다');};}
-  else{st.innerHTML='🔒 비로그인 (조회 전용)';btn.textContent='로그인';btn.onclick=openLogin;}
-}
-function openLogin(){document.getElementById('loginModal').style.display='flex';document.getElementById('loginMsg').textContent='';setTimeout(function(){const e=document.getElementById('loginEmail');if(e)e.focus();},50);}
-function closeLogin(){document.getElementById('loginModal').style.display='none';}
-async function doLogin(){
-  const email=document.getElementById('loginEmail').value.trim(),pw=document.getElementById('loginPw').value;
-  if(!email||!pw){document.getElementById('loginMsg').textContent='이메일과 비밀번호를 입력하세요';return;}
-  document.getElementById('loginMsg').textContent='로그인 중...';
-  if(await login(email,pw)){closeLogin();updateAuthUI();toast('로그인되었습니다');await reload();}
-  else{document.getElementById('loginMsg').textContent='로그인 실패 — 이메일/비밀번호를 확인하세요';}
-}
+/* 저장 후 재조회 + 현재 화면 갱신 */
 async function reload(){await fetchAll();refreshHome();
   if(document.getElementById('s-stats').classList.contains('on'))renderStats();
   if(document.getElementById('s-doc').classList.contains('on'))renderDocPick();}
@@ -430,7 +386,6 @@ function pickReason(v){document.getElementById('reason').value=v;}
 
 /* 저장/수정/삭제 */
 async function saveRecord(){
-  if(!TOKEN){openLogin();return;}
   const g=id=>document.getElementById(id).value;
   const terminal=document.querySelector('input[name=terminal]:checked').value;
   const io=document.querySelector('input[name=io]:checked').value;
@@ -474,8 +429,8 @@ function resetForm(){document.getElementById('editId').value='';
   const ym=document.getElementById('ym').value||'2024-07';
   const no=document.getElementById('docNo');if(no)no.value=genDocNo(ym);
   const dt=document.getElementById('docDate');if(dt)dt.value=nowStr();}
-function openInput(){if(!TOKEN){toast('로그인 후 입력할 수 있습니다');openLogin();return;}go('input');resetForm();const t=document.getElementById('inputTitle');if(t)t.textContent='접안 스케줄 지연 작성';reasonPH();}
-async function clearAll(){if(!TOKEN){openLogin();return;}if(!confirm('저장된 모든 자료를 삭제합니다.'))return;const ok=await dbDeleteAll();if(!ok)return;toast('전체 삭제되었습니다');await reload();}
+function openInput(){go('input');resetForm();const t=document.getElementById('inputTitle');if(t)t.textContent='접안 스케줄 지연 작성';reasonPH();}
+async function clearAll(){if(!confirm('저장된 모든 자료를 삭제합니다.'))return;const ok=await dbDeleteAll();if(!ok)return;toast('전체 삭제되었습니다');await reload();}
 
 /* 목록 렌더 */
 function recentRows(a){
@@ -643,13 +598,12 @@ function buildDocHtml(r){
   </div>`;
 }
 function printDoc(){if(!document.getElementById('docPick').value){toast('저장 자료를 선택하세요');return;}window.print();}  /* 개별 출력 — A4 가로 */
-function editDoc(){const id=document.getElementById('docPick').value;if(!id){toast('먼저 자료를 선택하세요');return;}if(!TOKEN){toast('로그인 후 수정할 수 있습니다');openLogin();return;}editRec(id);}
-async function delDoc(){const id=document.getElementById('docPick').value;if(!id){toast('먼저 자료를 선택하세요');return;}if(!TOKEN){toast('로그인 후 삭제할 수 있습니다');openLogin();return;}if(!confirm('이 지연 자료를 삭제하시겠습니까?'))return;const ok=await dbDelete(id);if(!ok)return;toast('삭제되었습니다');await reload();go('home');}
+function editDoc(){const id=document.getElementById('docPick').value;if(!id){toast('먼저 자료를 선택하세요');return;}editRec(id);}
+async function delDoc(){const id=document.getElementById('docPick').value;if(!id){toast('먼저 자료를 선택하세요');return;}if(!confirm('이 지연 자료를 삭제하시겠습니까?'))return;const ok=await dbDelete(id);if(!ok)return;toast('삭제되었습니다');await reload();go('home');}
 
 /* 엑셀 예시 데이터 (원본 스케줄 지연 시트 15건, 2024-07) */
 const SAMPLE=[['감만','출항','KRXN-13','2024-07-06T21:00','2024-07-06T22:00','도선 원웨이'],['감만','출항','SPTY-26','2024-07-09T06:00','2024-07-09T10:00','안개 및 강풍으로 중단'],['감만','출항','W293-05','2024-07-17T11:00','2024-07-17T14:00','안개로 도선 중단'],['감만','입항','W292-07','2024-07-03T03:00','2024-07-03T16:00','강풍으로 입항 도선 중단'],['감만','입항','W522-05','2024-07-10T01:00','2024-07-10T07:00','안개로 입항 중단'],['감만','입항','EAHO-24','2024-07-10T08:00','2024-07-10T14:00','강풍으로 도선 중단'],['감만','입항','JIPG-15','2024-07-28T07:00','2024-07-28T13:00','사고로 인한 VTS에서 입출항 중단'],['신선대','출항','KSDY-09','2024-07-10T08:00','2024-07-10T10:00','강풍으로 도선중단'],['신선대','출항','HASR-16','2024-07-10T08:00','2024-07-10T13:00','강풍으로 작업 중단'],['신선대','출항','PCNB-24','2024-07-17T11:00','2024-07-17T12:00','안개로 도선 중단'],['신선대','입항','SWMM-07','2024-07-03T20:00','2024-07-04T02:00','안개로 도선 중단'],['신선대','입항','KKDL-01','2024-07-05T08:00','2024-07-05T09:00','강풍으로 입항 도선 중단'],['신선대','입항','ORBT-11','2024-07-07T21:00','2024-07-09T08:00','안개로 도선 중단'],['신선대','입항','SKNT-21','2024-07-10T09:00','2024-07-10T11:00','강풍으로 도선 중단'],['신선대','입항','SKJD-14','2024-07-10T09:00','2024-07-10T14:00','강풍으로 작업 중단']];
 async function loadSample(){
-  if(!TOKEN){toast('로그인 후 불러올 수 있습니다');openLogin();return;}
   if(!confirm('공용 DB에 엑셀 예시 15건을 추가합니다. 진행할까요?'))return;
   const rows=SAMPLE.map((s,i)=>({id:uid()+'_'+i,ym:'2024-07',terminal:s[0],io:s[1],vessel:s[2],planned:s[3],changed:s[4],delayH:hoursBetween(s[3],s[4]),reason:s[5],docNo:'지연-2024-07-'+String(i+1).padStart(3,'0'),docDate:'',writer:'',checker:'',reasonDetail:s[5]}));
   const ok=await dbInsert(rows);
@@ -658,8 +612,7 @@ async function loadSample(){
 
 /* 시작 — 세션 복원 → 서버 자료 로딩 */
 (async function boot(){
-  try{const s=JSON.parse(localStorage.getItem('berth_auth')||'null');if(s&&s.refresh)await refreshToken();}catch(e){}
-  updateAuthUI();renderChips();reasonPH();
+  renderChips();reasonPH();
   await fetchAll();refreshHome();
 })();
 </script>
