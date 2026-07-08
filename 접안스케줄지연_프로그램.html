@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>접안 스케줄 지연 관리 프로그램</title>
+<style>
+  :root{--navy:#4a5670;--navy2:#cdddf0;--blue:#a7c8ec;--teal:#a9ddcf;--amber:#f3d3a0;--red:#f4b9c3;--grey:#8f9bad;--line:#e0e7f0;--panel:#f4f8fd;--bg:#eff3f9;--head:#dce7f5;--head2:#c6d7ee;--head-ink:#3c4a63;}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR","NanumGothic","Nanum Gothic",sans-serif;color:#1b263b;background:var(--bg);}
+  button{font-family:inherit;}
+  .app{display:flex;min-height:100vh;}
+  /* 사이드바 */
+  .side{width:220px;background:var(--head);color:var(--head-ink);flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--line);}
+  .side .brand{padding:20px 18px;border-bottom:1px solid rgba(60,74,99,.15);}
+  .side .brand h1{font-size:16px;margin:0;color:var(--navy);line-height:1.4;}
+  .side .brand p{font-size:11px;margin:6px 0 0;color:#6b7a92;}
+  .side nav{padding:12px 10px;flex:1;}
+  .side nav a{display:flex;align-items:center;gap:9px;padding:11px 14px;border-radius:8px;color:var(--head-ink);text-decoration:none;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:4px;}
+  .side nav a:hover{background:var(--navy2);}
+  .side nav a.on{background:var(--amber);color:var(--navy);}
+  .side .foot{padding:14px 18px;font-size:10.5px;color:#6b7a92;border-top:1px solid rgba(60,74,99,.15);}
+  /* 메인 */
+  .main{flex:1;padding:26px 30px;max-width:calc(100vw - 220px);}
+  .screen{display:none;} .screen.on{display:block;}
+  h2.title{font-size:21px;margin:0 0 4px;color:var(--navy);}
+  p.desc{margin:0 0 20px;color:var(--grey);font-size:13px;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:10px;margin-bottom:20px;overflow:hidden;}
+  .card>h3{background:var(--head);color:var(--head-ink);font-size:14px;margin:0;padding:11px 18px;border-bottom:1px solid var(--line);}
+  .card .cbody{padding:18px 20px;}
+  /* KPI */
+  .kpis{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:22px;}
+  .kpi{flex:1;min-width:150px;background:#fff;border:1px solid var(--line);border-left:5px solid var(--blue);border-radius:10px;padding:16px 18px;}
+  .kpi .v{font-size:28px;font-weight:800;color:var(--navy);}
+  .kpi .l{font-size:12.5px;color:var(--grey);margin-top:3px;}
+  .kpi.a{border-left-color:var(--amber);} .kpi.t{border-left-color:var(--teal);} .kpi.r{border-left-color:var(--red);}
+  .kpi .cmp{font-size:11.5px;margin-top:7px;color:var(--grey);border-top:1px dashed var(--line);padding-top:6px;}
+  .kpi .cmp .up{color:#d17a8b;font-weight:700;} .kpi .cmp .down{color:#3f9e8a;font-weight:700;} .kpi .cmp .same{color:var(--grey);font-weight:700;}
+  /* 폼 */
+  .frow{display:flex;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap;}
+  .frow label.lbl{width:130px;text-align:right;font-weight:700;font-size:13px;color:var(--navy);flex-shrink:0;}
+  input[type=text],input[type=month],input[type=date],input[type=datetime-local],select{padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:inherit;}
+  input[readonly]{background:#eef3fa;color:#b06378;font-weight:700;}
+  .radios{display:flex;gap:18px;} .radios label{font-size:13px;cursor:pointer;display:flex;align-items:center;gap:5px;}
+  .btn{border:none;border-radius:7px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;color:var(--navy);}
+  .btn.save{background:var(--blue);} .btn.q{background:var(--teal);} .btn.del{background:var(--grey);} .btn.print{background:var(--amber);} .btn.ghost{background:#fff;color:var(--navy);border:1px solid var(--line);}
+  .btn:hover{opacity:.9;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .hint{font-size:11.5px;color:var(--grey);}
+  /* 표 */
+  table.grid{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.grid th,table.grid td{border:1px solid var(--line);padding:6px 8px;text-align:center;}
+  table.grid th{background:var(--head);color:var(--head-ink);}
+  td.left{text-align:left;}
+  tr.sub td{background:#eaf0f8;font-weight:700;} tr.ttot td{background:var(--amber);color:var(--navy);font-weight:700;}
+  tr.bpt td{background:var(--head2);color:var(--navy);font-weight:700;font-size:13.5px;} tr.data:nth-child(even) td{background:#f7fafd;}
+  .mini td,.mini th{padding:4px 6px;font-size:12px;}
+  .qcond{display:none;} .qcond.on{display:flex;}
+  .flex{display:flex;gap:18px;flex-wrap:wrap;}
+  .chartbox{flex:1;min-width:250px;border:1px solid var(--line);border-radius:8px;padding:12px;background:#fff;}
+  .chartbox h4{margin:0 0 6px;font-size:13px;color:var(--navy);}
+  .actbtn{background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;}
+  .stat-ok{color:#3f9e8a;font-weight:700;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--head2);color:var(--navy);padding:12px 24px;border-radius:8px;font-size:14px;font-weight:700;opacity:0;transition:.3s;pointer-events:none;z-index:99;box-shadow:0 4px 14px rgba(60,74,99,.25);}
+  .toast.show{opacity:1;}
+  .note{font-size:11.5px;color:var(--grey);margin-top:10px;}
+  /* 지연사유서 문서 양식 */
+  #docView{margin-top:8px;}
+  .doc{max-width:190mm;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:6px;padding:30px 36px;}
+  .doc .dtitle{text-align:center;font-size:25px;font-weight:800;letter-spacing:12px;margin:4px 0 22px;color:var(--navy);}
+  .doc .dmeta{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:14px;color:#333;}
+  table.dtab{width:100%;border-collapse:collapse;font-size:13.5px;}
+  table.dtab th{background:var(--panel);border:1px solid #8a97a8;padding:11px 12px;width:120px;text-align:center;font-weight:700;}
+  table.dtab td{border:1px solid #8a97a8;padding:11px 12px;}
+  .reasonlbl{background:var(--panel);border:1px solid #8a97a8;border-top:none;padding:8px;font-weight:700;text-align:center;letter-spacing:5px;}
+  .reasonbox{border:1px solid #8a97a8;border-top:none;min-height:140px;padding:14px;font-size:13.5px;white-space:pre-wrap;line-height:1.75;}
+  .closing{margin:26px 0 8px;text-align:center;font-size:14.5px;}
+  .sign{margin-top:22px;text-align:right;font-size:14.5px;line-height:2.7;padding-right:14px;}
+  textarea{padding:9px 11px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;}
+  .printonly{display:none;}
+  @media print{
+    .side,.noprint{display:none!important;}
+    .main{max-width:none;padding:0;} .screen:not(.on){display:none;}
+    .card{border:none;break-inside:avoid;} .card>h3{background:#ddd;color:#000;}
+    .chartbox{break-inside:avoid;} tr.unsel{display:none!important;}
+    .printonly{display:block!important;}
+    .kpis{break-inside:avoid;}
+    .doc{border:none;max-width:255mm;margin:0 auto;padding:0;}
+  }
+  /* ===== 지연입력 카드형 폼 (스크린샷 유형) ===== */
+  .finput{max-width:940px;}
+  .ftitle{font-size:20px;font-weight:800;color:var(--navy);margin:0 0 18px;padding-left:12px;border-left:5px solid #58b08a;}
+  .fcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:16px;box-shadow:0 2px 10px rgba(74,86,112,.06);}
+  .flabel{font-size:15px;font-weight:800;color:var(--navy);margin-bottom:14px;}
+  .flabel b{color:#e0607a;}
+  .fright{float:right;font-size:12px;font-weight:600;color:var(--grey);}
+  .fhint{font-size:12px;font-weight:500;color:var(--grey);}
+  .fsub{font-size:12.5px;color:var(--grey);margin-bottom:7px;}
+  .fgrid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .finp{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:9px;font-size:14px;font-family:inherit;background:#fdfefe;color:#1b263b;}
+  .finp:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(167,200,236,.35);}
+  .finp-sm{width:150px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:13px;font-family:inherit;}
+  .frow2{display:flex;gap:8px;}
+  .frow2 .finp{flex:1;}
+  .btn-now{border:1px solid var(--blue);background:#fff;color:var(--navy);border-radius:9px;padding:0 16px;font-weight:700;font-size:13px;cursor:pointer;flex-shrink:0;}
+  .btn-now:hover{background:var(--navy2);}
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .seg label{display:block;cursor:pointer;position:relative;}
+  .seg input{position:absolute;opacity:0;width:0;height:0;}
+  .seg span{display:block;text-align:center;padding:14px 10px;border:1px solid var(--line);border-radius:10px;font-weight:700;font-size:15px;color:#5a6577;background:#fff;transition:.12s;}
+  .seg label:hover span{border-color:var(--blue);}
+  .seg input:checked+span{background:var(--head2);border-color:var(--navy);color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);}
+  .timebar{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:12px 14px;font-size:13.5px;font-weight:700;color:var(--navy);}
+  .timebar input{border:none;background:transparent;font-weight:800;color:var(--navy);width:80px;font-size:14px;font-family:inherit;}
+  .timebar #delayWarn{color:#c0392b;font-weight:700;font-size:12.5px;margin-left:8px;}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:20px;padding:7px 14px;font-size:12.5px;color:#5a6577;cursor:pointer;font-family:inherit;}
+  .chip:hover{border-color:var(--blue);background:var(--panel);color:var(--navy);}
+  .fmeta{margin-top:14px;font-size:12.5px;color:var(--grey);}
+  .fmeta input{border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;background:#eef3fa;color:#4a5670;font-weight:700;font-family:inherit;width:170px;}
+  .savebar{display:flex;gap:10px;align-items:center;margin-top:2px;}
+  .btn-save-lg{flex:1;background:linear-gradient(90deg,#3f6fb5,#4a5670);color:#fff;border:none;border-radius:11px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;}
+  .btn-save-lg:hover{opacity:.93;}
+  .btn-save-lg:disabled{opacity:.5;cursor:not-allowed;}
+  @media(max-width:640px){.fgrid2{grid-template-columns:1fr;}}
+  /* 자료조회 상단 배너 (대상/입출항 선택) */
+  .listbanner{display:flex;flex-direction:column;gap:10px;background:var(--head);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:14px;}
+  .listbanner .lb-group{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .listbanner .lb-lbl{font-weight:800;color:var(--navy);font-size:13px;min-width:56px;}
+  .listbanner label{font-size:13.5px;cursor:pointer;display:flex;align-items:center;gap:4px;color:var(--head-ink);}
+</style>
+<style id="pageOrient">@page{size:A4 landscape;margin:9mm;}</style>
+</head>
+<body>
+<div class="app">
+  <!-- 사이드바 -->
+  <aside class="side noprint">
+    <div class="brand"><h1>접안 스케줄 지연<br>관리 프로그램</h1><p>신선대 · 감만 터미널</p></div>
+    <nav>
+      <a id="m-home" class="on" onclick="go('home')">🏠 홈 (조회 · 관리)</a>
+      <a id="m-input" onclick="openInput()">📝 지연 입력</a>
+      <a id="m-stats" onclick="go('stats')">📊 통계 분석</a>
+    </nav>
+    <div class="foot">v1.0 · 로컬 저장<br>운영팀(프레나) 개발요청 기반</div>
+  </aside>
+
+  <main class="main">
+    <!-- ===== 홈 ===== -->
+    <section id="s-home" class="screen on">
+      <h2 class="title noprint">🏠 접안 스케줄 지연 관리</h2>
+      <p class="desc noprint">기준 년월의 당월 실적을 전월과 비교해 표시합니다.</p>
+      <div class="frow noprint" style="margin:0 0 14px">
+        <label class="lbl" style="width:auto;text-align:left">기준 년월</label>
+        <input type="month" id="dashYm" onchange="renderHome()">
+        <span class="hint">당월 vs 전월(<span id="dashPrevLbl">-</span>) 비교</span>
+      </div>
+      <div class="kpis noprint">
+        <div class="kpi"><div class="v" id="k-cnt">0</div><div class="l">당월 등록 건수(척)</div><div class="cmp" id="k-cnt-c"></div></div>
+        <div class="kpi t"><div class="v" id="k-total">0</div><div class="l">당월 지연시간(h) = BPT</div><div class="cmp" id="k-total-c"></div></div>
+        <div class="kpi a"><div class="v" id="k-sd">0</div><div class="l">당월 신선대 지연(h)</div><div class="cmp" id="k-sd-c"></div></div>
+        <div class="kpi r"><div class="v" id="k-gm">0</div><div class="l">당월 감만 지연(h)</div><div class="cmp" id="k-gm-c"></div></div>
+      </div>
+      <div class="card"><h3>📋 저장 자료 조회 · 관리 <span id="manageCnt" style="font-weight:400;font-size:12px"></span></h3><div class="cbody">
+        <div class="listbanner noprint">
+          <div class="lb-group"><span class="lb-lbl">대상</span>
+            <label><input type="radio" name="listTerm" value="BPT" checked onchange="runQuery()"> BPT 전체</label>
+            <label><input type="radio" name="listTerm" value="신선대" onchange="runQuery()"> 신선대</label>
+            <label><input type="radio" name="listTerm" value="감만" onchange="runQuery()"> 감만</label></div>
+          <div class="lb-group"><span class="lb-lbl">입·출항</span>
+            <label><input type="radio" name="listIO" value="전체" checked onchange="runQuery()"> 전체</label>
+            <label><input type="radio" name="listIO" value="입항" onchange="runQuery()"> 입항</label>
+            <label><input type="radio" name="listIO" value="출항" onchange="runQuery()"> 출항</label></div>
+        </div>
+        <div class="frow noprint"><label class="lbl">조회</label><div class="radios">
+          <label><input type="radio" name="qtype" value="all" checked onchange="switchQ()"> 전체</label>
+          <label><input type="radio" name="qtype" value="year" onchange="switchQ()"> 연도별</label>
+          <label><input type="radio" name="qtype" value="month" onchange="switchQ()"> 년월별</label>
+          <label><input type="radio" name="qtype" value="range" onchange="switchQ()"> 기간별</label></div>
+          <button class="btn q" onclick="runQuery()" style="margin-left:10px">🔍 조회</button>
+          <span style="flex:1"></span>
+          <button class="btn save" onclick="openInput()">＋ 지연 입력</button></div>
+        <div class="frow qcond noprint" id="q-year"><label class="lbl">연도</label><input type="text" id="qYear" value="2024" style="width:100px" maxlength="4"><span class="hint">YYYY</span></div>
+        <div class="frow qcond noprint" id="q-month"><label class="lbl">년월</label><input type="month" id="qMonth" value="2024-07"></div>
+        <div class="frow qcond noprint" id="q-range"><label class="lbl">기간</label><input type="date" id="qFrom" value="2024-07-01"> ~ <input type="date" id="qTo" value="2024-07-31"><span class="hint">기존 입출항시간 기준</span></div>
+        <div class="frow noprint"><label class="lbl">검색</label><input type="text" id="listSearch" placeholder="모선명 또는 사유로 검색" oninput="runQuery()" style="width:300px"><span class="hint">전체 기간에서 모선명·사유 검색</span></div>
+        <div style="overflow-x:auto"><table class="grid mini" id="manageTable"></table></div>
+        <div style="margin-top:12px" class="noprint">
+          <button class="btn ghost" onclick="loadSample()">엑셀 예시 15건 불러오기</button>
+          <button class="btn ghost" onclick="clearAll()">전체 삭제</button>
+        </div>
+        <div class="note noprint">※ <b>행(모선)을 클릭하면 지연사유서에서 상세·수정·삭제·출력</b> · [＋ 지연 입력]으로 새 자료. 상단 배너로 대상·입출항, 아래 검색으로 모선명·사유 조회.</div>
+      </div></div>
+    </section>
+
+    <!-- ===== 지연 입력 (별도 페이지) ===== -->
+    <section id="s-input" class="screen finput">
+      <h2 class="ftitle noprint" id="inputTitle">접안 스케줄 지연 작성</h2>
+      <input type="hidden" id="editId">
+      <div class="fcard noprint">
+        <div class="flabel">터미널 · 입출항 <b>*</b></div>
+        <div class="fgrid2">
+          <div><div class="fsub">터미널</div>
+            <div class="seg">
+              <label><input type="radio" name="terminal" value="신선대"><span>신선대</span></label>
+              <label><input type="radio" name="terminal" value="감만" checked><span>감만</span></label>
+            </div></div>
+          <div><div class="fsub">입출항 구분</div>
+            <div class="seg">
+              <label><input type="radio" name="io" value="입항" checked onchange="reasonPH()"><span>입항</span></label>
+              <label><input type="radio" name="io" value="출항" onchange="reasonPH()"><span>출항</span></label>
+            </div></div>
+        </div>
+      </div>
+      <div class="fcard noprint">
+        <div class="flabel">모선명 <b>*</b></div>
+        <input type="text" id="vessel" class="finp" placeholder="예: KRXN-13">
+      </div>
+      <div class="fcard noprint">
+        <div class="flabel">입출항시간 (기존 → 변경) <b>*</b>
+          <span class="fright">관리연월 <input type="month" id="ym" value="2024-07" class="finp-sm"></span></div>
+        <div class="fgrid2">
+          <div><div class="fsub">기존 입출항시간</div>
+            <div class="frow2"><input type="datetime-local" id="planned" class="finp" oninput="calcDelay()"><button type="button" class="btn-now" onclick="setNow('planned')">지금</button></div></div>
+          <div><div class="fsub">변경 입출항시간</div>
+            <div class="frow2"><input type="datetime-local" id="changed" class="finp" oninput="calcDelay()"><button type="button" class="btn-now" onclick="setNow('changed')">지금</button></div></div>
+        </div>
+        <div class="timebar">지연시간(자동계산) — <input type="text" id="delay" readonly value="0 h"><span id="delayWarn"></span></div>
+      </div>
+      <div class="fcard noprint">
+        <div class="flabel" id="reasonLbl">지연 사유</div>
+        <input type="text" id="reason" class="finp" list="reasonList" placeholder="클릭하면 목록에서 선택 · 직접 입력도 가능">
+        <datalist id="reasonList">
+          <option value="안개로 도선 중단"><option value="강풍으로 도선 중단"><option value="강풍으로 작업 중단">
+          <option value="안개 및 강풍으로 중단"><option value="안개로 입항 중단"><option value="도선 원웨이">
+          <option value="사고로 인한 VTS에서 입출항 중단">
+        </datalist>
+        <div class="chips" id="reasonChips"></div>
+      </div>
+      <div class="fcard noprint">
+        <div class="flabel">특이 · 전달 사항 <span class="fhint">(사유서 상세 — 비우면 위 '지연 사유'가 사용됩니다)</span></div>
+        <textarea id="reasonDetail" class="finp" rows="3" placeholder="예: 도선 원웨이 동반 / 다음 작업조 인계사항"></textarea>
+      </div>
+      <div class="fcard noprint">
+        <div class="flabel">문서 정보 <span class="fhint">(자동 기록)</span></div>
+        <input type="hidden" id="writer"><input type="hidden" id="checker">
+        <div class="fmeta" style="margin-top:0">문서번호 <input type="text" id="docNo" readonly> · 작성일시 <input type="text" id="docDate" readonly></div>
+        <div class="fhint" style="margin-top:10px">※ 작성자·확인자 서명란은 지연사유서 <b>출력물에만</b> 표시됩니다 (인쇄 후 직접 서명).</div>
+      </div>
+      <div class="savebar noprint">
+        <button class="btn-save-lg" id="saveBtn" onclick="saveRecord()">기록 저장</button>
+        <button class="btn ghost" onclick="resetForm()">초기화</button>
+        <button class="btn ghost" onclick="go('home')">취소</button>
+      </div>
+    </section>
+
+    <!-- ===== 통계 분석 ===== -->
+    <section id="s-stats" class="screen">
+      <h2 class="title noprint">📊 스케줄 지연 통계 분석</h2>
+      <p class="desc noprint">저장된 지연 자료를 대상·입출항·기간 단위로 집계해 그래프로 보여줍니다.</p>
+      <div class="printonly" id="statsPrintHead" style="font-size:17px;font-weight:800;color:#1b263b;border-left:5px solid #4a5670;padding-left:12px;margin-bottom:14px;"></div>
+      <div class="card noprint"><h3>분석 조건</h3><div class="cbody">
+        <div class="frow"><label class="lbl">대상</label><div class="radios">
+          <label><input type="radio" name="statTerm" value="BPT" checked onchange="renderStats()"> BPT 전체</label>
+          <label><input type="radio" name="statTerm" value="신선대" onchange="renderStats()"> 신선대</label>
+          <label><input type="radio" name="statTerm" value="감만" onchange="renderStats()"> 감만</label></div></div>
+        <div class="frow"><label class="lbl">입 · 출항</label><div class="radios">
+          <label><input type="radio" name="statIO" value="전체" checked onchange="renderStats()"> 전체</label>
+          <label><input type="radio" name="statIO" value="입항" onchange="renderStats()"> 입항</label>
+          <label><input type="radio" name="statIO" value="출항" onchange="renderStats()"> 출항</label></div></div>
+        <div class="frow"><label class="lbl">기간 단위</label><div class="radios">
+          <label><input type="radio" name="statPeriod" value="month" checked onchange="renderStats()"> 월별</label>
+          <label><input type="radio" name="statPeriod" value="quarter" onchange="renderStats()"> 분기</label>
+          <label><input type="radio" name="statPeriod" value="half" onchange="renderStats()"> 반기</label>
+          <label><input type="radio" name="statPeriod" value="year" onchange="renderStats()"> 연간</label></div>
+          <button class="btn print" onclick="window.print()" style="margin-left:14px">🖨 통계 출력 (A4 가로)</button></div>
+        <div class="note">※ 대상=BPT 전체는 신선대+감만 합산. KPI와 상단 4개 그래프는 선택 조건이 반영되고, 맨 아래 "터미널·입출항 개요"는 전체 자료 기준입니다. [출력]은 화면의 KPI·표·그래프를 A4 가로로 인쇄합니다.</div>
+      </div></div>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="st-cnt">0</div><div class="l">선택 조건 건수(척)</div></div>
+        <div class="kpi t"><div class="v" id="st-tot">0</div><div class="l">총 지연시간(h)</div></div>
+        <div class="kpi a"><div class="v" id="st-avg">0</div><div class="l">건당 평균(h)</div></div>
+        <div class="kpi r"><div class="v" id="st-max" style="font-size:18px">-</div><div class="l">최다 지연 기간</div></div>
+      </div>
+      <div class="card"><h3>기간별 지연시간 · 발생 건수 (숫자)</h3><div class="cbody" style="overflow-x:auto">
+        <table class="grid" id="scPeriodTable"></table></div></div>
+      <div class="card"><h3>사유별 지연시간 (h)</h3><div class="cbody" style="overflow-x:auto"><div id="scReasonH"></div></div></div>
+      <div class="card"><h3>사유별 비중 (건수)</h3><div class="cbody" style="overflow-x:auto"><div id="scReasonPie"></div></div></div>
+      <div class="card"><h3>터미널별 지연시간 (입/출항 누적) <span style="font-weight:400;font-size:12px;color:#8d99ae">— 전체 자료 기준</span></h3><div class="cbody" style="overflow-x:auto"><div id="scTermIO"></div></div></div>
+      <div class="card"><h3>입항 vs 출항 (h) <span style="font-weight:400;font-size:12px;color:#8d99ae">— 전체 자료 기준</span></h3><div class="cbody" style="overflow-x:auto"><div id="scIO"></div></div></div>
+    </section>
+
+    <!-- ===== 지연사유서 (출력 전용) ===== -->
+    <section id="s-doc" class="screen">
+      <h2 class="title noprint">📄 지연사유서 (출력)</h2>
+      <p class="desc noprint">저장 자료를 선택하면 지연입력 때 함께 작성한 내용으로 사유서가 자동 완성됩니다. A4 가로 1장 인쇄.</p>
+      <div class="card noprint"><div class="cbody">
+        <div class="frow"><label class="lbl">저장 자료 선택</label>
+          <select id="docPick" onchange="docFill()" style="min-width:320px"></select>
+          <button class="btn q" onclick="editDoc()" style="margin-left:10px">✏ 수정</button>
+          <button class="btn del" onclick="delDoc()">🗑 삭제</button>
+          <button class="btn print" onclick="printDoc()">🖨 개별 출력 (A4 가로)</button>
+          <button class="btn ghost" onclick="go('home')">← 목록으로</button></div>
+        <div class="note">※ 조회·관리 목록에서 모선(행)을 클릭하면 여기로 들어옵니다. 이 화면에서 <b>수정·삭제·출력</b>할 수 있습니다.</div>
+      </div></div>
+      <div id="docView"></div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY='berthDelay_prog_v1';
+const PIE=['#a7c8ec','#a9ddcf','#f3cf9c','#f2b0bd','#c9bfe6','#bcc8da'];
+/* 저장소: localStorage 우선, 사용 불가(개인정보 모드·차단 등) 시 세션 메모리로 자동 대체 */
+let STORE_OK=(function(){try{localStorage.setItem('__berth_t','1');localStorage.removeItem('__berth_t');return true;}catch(e){return false;}})();
+let MEM=[];
+function load(){if(!STORE_OK)return MEM;try{return JSON.parse(localStorage.getItem(KEY))||[];}catch(e){return[];}}
+function save(a){if(!STORE_OK){MEM=a;return;}try{localStorage.setItem(KEY,JSON.stringify(a));}catch(e){STORE_OK=false;MEM=a;}}
+function uid(){return 'r'+Date.now()+Math.floor(Math.random()*999);}
+function hoursBetween(p,c){if(!p||!c)return null;return Math.round((new Date(c)-new Date(p))/3600000);}
+function fmt(dt){return dt?dt.replace('T',' '):'';}
+function catR(r){r=r||'';const f=r.includes('안개'),w=r.includes('강풍');if(r.includes('원웨이'))return'도선 원웨이';if(r.includes('사고'))return'사고(VTS)';if(f&&w)return'안개+강풍(복합)';if(w)return'강풍';if(f)return'안개';return'기타';}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800);}
+
+/* 화면 전환 */
+function go(s){
+  ['home','input','stats','doc'].forEach(x=>{
+    document.getElementById('s-'+x).classList.toggle('on',x===s);
+    const m=document.getElementById('m-'+x);if(m)m.classList.toggle('on',x===s);});
+  if(s==='home')refreshHome();
+  if(s==='stats')renderStats();
+  if(s==='doc')renderDocPick();
+}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+/* 지연시간 자동계산 / 사유 라벨 */
+function calcDelay(){
+  const h=hoursBetween(document.getElementById('planned').value,document.getElementById('changed').value);
+  const df=document.getElementById('delay'),warn=document.getElementById('delayWarn'),btn=document.getElementById('saveBtn');
+  df.value=(h==null?0:h)+' h';
+  if(h!=null&&h<0){df.style.color='#c0392b';if(warn)warn.textContent='⚠ 변경 시간이 기존 시간보다 빠릅니다 — 저장할 수 없습니다';if(btn)btn.disabled=true;}
+  else{df.style.color='';if(warn)warn.textContent='';if(btn)btn.disabled=false;}
+}
+function reasonPH(){const io=document.querySelector('input[name=io]:checked').value;document.getElementById('reasonLbl').textContent=io+' 지연 사유';}
+/* '지금' 버튼 — 현재 시각으로 채움 */
+function nowLocal(){const d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+'T'+pad2(d.getHours())+':'+pad2(d.getMinutes());}
+function setNow(id){document.getElementById(id).value=nowLocal();calcDelay();}
+/* 지연 사유 칩 (클릭하면 입력칸 채움) */
+const REASONS=['안개로 도선 중단','강풍으로 도선 중단','강풍으로 작업 중단','안개 및 강풍으로 중단','안개로 입항 중단','도선 원웨이','사고로 인한 VTS에서 입출항 중단'];
+function renderChips(){const el=document.getElementById('reasonChips');if(!el)return;el.innerHTML=REASONS.map(r=>`<button type="button" class="chip" onclick="pickReason('${r}')">${r}</button>`).join('');}
+function pickReason(v){document.getElementById('reason').value=v;}
+
+/* 저장/수정/삭제 */
+function saveRecord(){
+  const g=id=>document.getElementById(id).value;
+  const terminal=document.querySelector('input[name=terminal]:checked').value;
+  const io=document.querySelector('input[name=io]:checked').value;
+  const vessel=g('vessel').trim(),planned=g('planned'),changed=g('changed');
+  if(!vessel){toast('모선명을 입력하세요');return;}
+  if(!planned||!changed){toast('기존/변경 입출항시간을 입력하세요');return;}
+  const delayH=hoursBetween(planned,changed);
+  if(delayH==null){toast('기존/변경 입출항시간을 확인하세요');return;}
+  if(delayH<0){toast('⚠ 변경 시간이 기존 시간보다 빠릅니다 — 저장할 수 없습니다');return;}
+  const isNew=!g('editId'),ym=g('ym');
+  const docNo=isNew?genDocNo(ym):(g('docNo')||genDocNo(ym));
+  const docDate=isNew?nowStr():(g('docDate')||nowStr());
+  const rec={id:g('editId')||uid(),ym,terminal,io,vessel,planned,changed,delayH,
+    reason:g('reason').trim(),docNo,docDate,
+    writer:g('writer').trim(),checker:g('checker').trim(),reasonDetail:g('reasonDetail').trim()};
+  let a=load();const i=a.findIndex(x=>x.id===rec.id);
+  if(i>=0){a[i]=rec;toast('수정되었습니다');}else{a.push(rec);toast('저장되었습니다');}
+  save(a);resetForm();go('home');
+}
+function editRec(id){const r=load().find(x=>x.id===id);if(!r)return;go('input');
+  document.getElementById('editId').value=r.id;document.getElementById('ym').value=r.ym;
+  document.querySelector(`input[name=terminal][value="${r.terminal}"]`).checked=true;
+  document.querySelector(`input[name=io][value="${r.io}"]`).checked=true;reasonPH();
+  document.getElementById('vessel').value=r.vessel;document.getElementById('planned').value=r.planned;
+  document.getElementById('changed').value=r.changed;document.getElementById('reason').value=r.reason||'';calcDelay();
+  document.getElementById('docNo').value=r.docNo||'';document.getElementById('docDate').value=r.docDate||'';
+  document.getElementById('writer').value=r.writer||'';document.getElementById('checker').value=r.checker||'';
+  document.getElementById('reasonDetail').value=r.reasonDetail||'';
+  const t=document.getElementById('inputTitle');if(t)t.textContent='접안 스케줄 지연 수정';}
+function delRec(id){if(!confirm('삭제하시겠습니까?'))return;save(load().filter(x=>x.id!==id));refreshHome();}
+function pad2(n){return String(n).padStart(2,'0');}
+function nowStr(){const d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+' '+pad2(d.getHours())+':'+pad2(d.getMinutes());}
+function genDocNo(ym){ym=ym||'2024-07';const pre='지연-'+ym+'-';let mx=0;load().forEach(r=>{if((r.docNo||'').startsWith(pre)){const n=parseInt(r.docNo.slice(pre.length),10);if(!isNaN(n)&&n>mx)mx=n;}});return pre+String(mx+1).padStart(3,'0');}
+function resetForm(){document.getElementById('editId').value='';
+  ['vessel','planned','changed','reason','writer','checker','reasonDetail'].forEach(i=>{const e=document.getElementById(i);if(e)e.value='';});
+  document.getElementById('delay').value='0 h';document.getElementById('delay').style.color='';
+  const warn=document.getElementById('delayWarn');if(warn)warn.textContent='';
+  const btn=document.getElementById('saveBtn');if(btn)btn.disabled=false;
+  const t=document.querySelector('input[name=terminal][value="감만"]');if(t)t.checked=true;
+  const ioEl=document.querySelector('input[name=io][value="입항"]');if(ioEl){ioEl.checked=true;reasonPH();}
+  const ym=document.getElementById('ym').value||'2024-07';
+  const no=document.getElementById('docNo');if(no)no.value=genDocNo(ym);
+  const dt=document.getElementById('docDate');if(dt)dt.value=nowStr();}
+function openInput(){go('input');resetForm();const t=document.getElementById('inputTitle');if(t)t.textContent='접안 스케줄 지연 작성';reasonPH();}
+function clearAll(){if(!confirm('저장된 모든 자료를 삭제합니다.'))return;save([]);refreshHome();}
+
+/* 목록 렌더 */
+function recentRows(a){
+  let h='<tr><th>관리월</th><th>터미널</th><th>입출항</th><th>모선명</th><th>기존</th><th>변경</th><th>지연(h)</th><th>사유</th></tr>';
+  if(!a.length)h+='<tr><td colspan="8" style="color:#8d99ae">자료가 없습니다. "엑셀 예시 15건 불러오기"로 예시를 볼 수 있습니다.</td></tr>';
+  a.forEach(r=>{h+=`<tr class="data" style="cursor:pointer" title="클릭 → 지연사유서에서 상세·수정·삭제·출력" onclick="openDoc('${r.id}')"><td>${r.ym}</td><td>${r.terminal}</td><td>${r.io}</td><td>${r.vessel}</td><td>${fmt(r.planned)}</td><td>${fmt(r.changed)}</td><td>${r.delayH}</td><td class="left">${r.reason||''}</td></tr>`;});
+  return h;
+}
+function ymPrev(ym){if(!/^\d{4}-\d{2}$/.test(ym||''))return '';let[y,m]=ym.split('-').map(Number);m--;if(m<1){m=12;y--;}return y+'-'+String(m).padStart(2,'0');}
+function latestYm(a){const ms=a.map(r=>r.ym).filter(Boolean).sort();return ms.length?ms[ms.length-1]:'2024-07';}
+function setKpi(id,cur,prev,u){
+  document.getElementById(id).textContent=cur;
+  const d=cur-prev,el=document.getElementById(id+'-c');
+  const cls=d>0?'up':(d<0?'down':'same'),ar=d>0?'▲':(d<0?'▼':'—');
+  const pct=prev>0?' '+Math.round(Math.abs(d)/prev*100)+'%':'';
+  el.innerHTML=`전월 ${prev}${u} <span class="${cls}">${ar}${Math.abs(d)}${u}${pct}</span>`;
+}
+function renderHome(){
+  const a=load();
+  const di=document.getElementById('dashYm');
+  if(!di.value)di.value=latestYm(a);
+  const cur=di.value,prev=ymPrev(cur);
+  document.getElementById('dashPrevLbl').textContent=prev||'-';
+  const M=rows=>({cnt:rows.length,tot:rows.reduce((s,r)=>s+r.delayH,0),
+    sd:rows.filter(r=>r.terminal==='신선대').reduce((s,r)=>s+r.delayH,0),
+    gm:rows.filter(r=>r.terminal==='감만').reduce((s,r)=>s+r.delayH,0)});
+  const c=M(a.filter(r=>r.ym===cur)),p=M(a.filter(r=>r.ym===prev));
+  setKpi('k-cnt',c.cnt,p.cnt,'건');
+  setKpi('k-total',c.tot,p.tot,'h');
+  setKpi('k-sd',c.sd,p.sd,'h');
+  setKpi('k-gm',c.gm,p.gm,'h');
+}
+function renderManageRows(rows){
+  const el=document.getElementById('manageTable');if(!el)return;
+  const a=rows.slice().reverse();
+  const cb=document.getElementById('manageCnt');if(cb)cb.textContent='(조회 '+a.length+'건)';
+  el.innerHTML=recentRows(a);
+}
+/* 홈 통합 갱신: KPI + 조회(리스트) */
+function refreshHome(){renderHome();runQuery();}
+
+/* 조회 */
+function switchQ(){const t=document.querySelector('input[name=qtype]:checked').value;
+  document.getElementById('q-year').classList.toggle('on',t==='year');
+  document.getElementById('q-month').classList.toggle('on',t==='month');
+  document.getElementById('q-range').classList.toggle('on',t==='range');}
+function filterRecords(){
+  const t=document.querySelector('input[name=qtype]:checked').value;let a=load(),label='';
+  if(t==='all'){label='전체';}
+  else if(t==='year'){const y=document.getElementById('qYear').value;a=a.filter(r=>(r.ym||'').slice(0,4)===y);label=y+'년';}
+  else if(t==='month'){const m=document.getElementById('qMonth').value;a=a.filter(r=>r.ym===m);label=m;}
+  else{const f=document.getElementById('qFrom').value,to=document.getElementById('qTo').value;a=a.filter(r=>{const d=(r.planned||'').slice(0,10);return d>=f&&d<=to;});label=f+' ~ '+to;}
+  const term=(document.querySelector('input[name=listTerm]:checked')||{}).value||'BPT';
+  const io=(document.querySelector('input[name=listIO]:checked')||{}).value||'전체';
+  if(term!=='BPT')a=a.filter(r=>r.terminal===term);
+  if(io!=='전체')a=a.filter(r=>r.io===io);
+  const se=document.getElementById('listSearch'),kw=se?se.value.trim().toLowerCase():'';
+  if(kw)a=a.filter(r=>((r.vessel||'')+' '+(r.reason||'')+' '+(r.reasonDetail||'')).toLowerCase().includes(kw));
+  return{rows:a,label};
+}
+function runQuery(){const {rows}=filterRecords();renderManageRows(rows);}
+
+/* ===== 지연사유서 ===== */
+function renderDocPick(){
+  const a=load();
+  let o='<option value="">— 저장 자료에서 선택 —</option>';
+  a.slice().reverse().forEach(r=>{o+=`<option value="${r.id}">${r.terminal} · ${r.io} · ${r.vessel} (${r.ym}, ${r.delayH}h)</option>`;});
+  document.getElementById('docPick').innerHTML=o;
+  document.getElementById('docView').innerHTML='<div class="note" style="padding:22px">위에서 저장 자료를 선택하면 지연사유서 미리보기가 표시됩니다.</div>';
+}
+function docFill(){
+  const id=document.getElementById('docPick').value;
+  if(!id){document.getElementById('docView').innerHTML='<div class="note" style="padding:22px">저장 자료를 선택하세요.</div>';return;}
+  const r=load().find(x=>x.id===id);if(!r)return;
+  document.getElementById('docView').innerHTML=buildDocHtml(r);
+}
+/* 목록 행 클릭 → 지연사유서 페이지에서 해당 자료 상세 표시 */
+function openDoc(id){go('doc');const sel=document.getElementById('docPick');if(sel)sel.value=id;docFill();}
+
+/* ===== 통계 분석 (SVG 자체 렌더, 라이브러리 없음) ===== */
+function wrapLbl(t,x,y,fs){t=t||'';
+  if(t.length<=6)return `<text x="${x}" y="${y}" text-anchor="middle" font-size="${fs}" fill="#5a6577">${t}</text>`;
+  let bp=-1;for(const ch of ['(',' ','+']){const i=t.indexOf(ch);if(i>0){bp=i;break;}}
+  if(bp<0)bp=Math.ceil(t.length/2);
+  return `<text x="${x}" y="${y}" text-anchor="middle" font-size="${fs}" fill="#5a6577">${t.slice(0,bp)}</text><text x="${x}" y="${y+fs+2}" text-anchor="middle" font-size="${fs}" fill="#5a6577">${t.slice(bp)}</text>`;}
+function svgBar(el,data){if(!el)return;const VW=760,TM=42,CH=240,BL=76,VH=TM+CH+BL;
+  const head=`<svg width="100%" viewBox="0 0 ${VW} ${VH}" font-family="Malgun Gothic,Apple SD Gothic Neo,Noto Sans KR,sans-serif" preserveAspectRatio="xMidYMid meet">`;
+  if(!data.length){el.innerHTML=head+`<text x="${VW/2}" y="${TM+CH/2}" text-anchor="middle" fill="#8f9bad" font-size="15">자료 없음</text></svg>`;return;}
+  const mx=Math.max(1,...data.map(d=>d.v)),AW=VW-32,slot=AW/data.length,bw=Math.min(98,slot*0.6);
+  let s=head;
+  data.forEach((d,i)=>{const bh=d.v/mx*CH,bx=16+i*slot+(slot-bw)/2,by=TM+CH-bh;
+    s+=`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="${d.col||'#a7c8ec'}" rx="5"/>`;
+    s+=`<text x="${bx+bw/2}" y="${by-10}" text-anchor="middle" font-size="16" font-weight="700" fill="#4a5670">${d.v}</text>`;
+    s+=wrapLbl(d.l,bx+bw/2,TM+CH+24,13);});
+  el.innerHTML=s+'</svg>';}
+function svgPie(el,data){if(!el)return;const tot=data.reduce((s,d)=>s+d.v,0);
+  const VW=760,VH=330,head=`<svg width="100%" viewBox="0 0 ${VW} ${VH}" font-family="Malgun Gothic,Apple SD Gothic Neo,Noto Sans KR,sans-serif" preserveAspectRatio="xMidYMid meet">`;
+  if(!tot){el.innerHTML=head+`<text x="${VW/2}" y="${VH/2}" text-anchor="middle" fill="#8f9bad" font-size="15">자료 없음</text></svg>`;return;}
+  const R=128,cx=165,cy=165;let a=-Math.PI/2,s=head;
+  data.forEach((d,i)=>{const ang=d.v/tot*2*Math.PI,x1=cx+R*Math.cos(a),y1=cy+R*Math.sin(a);a+=ang;const x2=cx+R*Math.cos(a),y2=cy+R*Math.sin(a),big=ang>Math.PI?1:0;
+    s+=`<path d="M${cx} ${cy} L${x1} ${y1} A${R} ${R} 0 ${big} 1 ${x2} ${y2} Z" fill="${PIE[i%6]}" stroke="#fff" stroke-width="2"/>`;
+    if(d.v/tot>0.05){const mid=a-ang/2;s+=`<text x="${cx+R*.62*Math.cos(mid)}" y="${cy+R*.62*Math.sin(mid)+5}" text-anchor="middle" fill="#4a5670" font-size="15" font-weight="700">${Math.round(d.v/tot*100)}%</text>`;}});
+  data.forEach((d,i)=>{const yy=46+i*30;s+=`<rect x="360" y="${yy-14}" width="16" height="16" fill="${PIE[i%6]}"/><text x="384" y="${yy}" font-size="14.5" fill="#4a5670">${d.l} (${d.v})</text>`;});
+  el.innerHTML=s+'</svg>';}
+function svgStack(el,cats){if(!el)return;const VW=760,TM=44,CH=240,BL=48,VH=TM+CH+BL;
+  const mx=Math.max(1,...cats.map(c=>c.in+c.out)),BARR=VW-180,slot=BARR/cats.length,bw=Math.min(130,slot*0.5);
+  let s=`<svg width="100%" viewBox="0 0 ${VW} ${VH}" font-family="Malgun Gothic,Apple SD Gothic Neo,Noto Sans KR,sans-serif" preserveAspectRatio="xMidYMid meet">`;
+  cats.forEach((c,i)=>{const ih=c.in/mx*CH,oh=c.out/mx*CH,bx=16+i*slot+(slot-bw)/2,yin=TM+CH-ih,yout=yin-oh;
+    s+=`<rect x="${bx}" y="${yin}" width="${bw}" height="${ih}" fill="#a7c8ec"/><rect x="${bx}" y="${yout}" width="${bw}" height="${oh}" fill="#f3cf9c"/>`;
+    if(ih>18)s+=`<text x="${bx+bw/2}" y="${yin+ih/2+6}" text-anchor="middle" font-size="14" font-weight="700" fill="#4a5670">${c.in}</text>`;
+    if(oh>18)s+=`<text x="${bx+bw/2}" y="${yout+oh/2+6}" text-anchor="middle" font-size="14" font-weight="700" fill="#4a5670">${c.out}</text>`;
+    s+=`<text x="${bx+bw/2}" y="${yout-10}" text-anchor="middle" font-size="14" font-weight="700" fill="#4a5670">계 ${c.in+c.out}</text>`;
+    s+=`<text x="${bx+bw/2}" y="${TM+CH+26}" text-anchor="middle" font-size="14" fill="#5a6577">${c.l}</text>`;});
+  s+=`<rect x="${VW-120}" y="14" width="15" height="15" fill="#a7c8ec"/><text x="${VW-100}" y="26" font-size="13.5" fill="#5a6577">입항</text>`;
+  s+=`<rect x="${VW-120}" y="36" width="15" height="15" fill="#f3cf9c"/><text x="${VW-100}" y="48" font-size="13.5" fill="#5a6577">출항</text>`;
+  el.innerHTML=s+'</svg>';}
+function periodKey(r,u){const [y,m]=(r.ym||'').split('-').map(Number);if(!y)return '기타';
+  if(u==='year')return y+'년';if(u==='half')return y+' '+(m<=6?'상반기':'하반기');if(u==='quarter')return y+' '+Math.ceil(m/3)+'Q';return r.ym;}
+function periodOrd(r,u){const [y,m]=(r.ym||'').split('-').map(Number);if(!y)return 9e9;
+  if(u==='year')return y*100;if(u==='half')return y*100+(m<=6?1:2);if(u==='quarter')return y*100+Math.ceil(m/3);return y*100+m;}
+function renderStats(){
+  const gv=n=>{const e=document.querySelector('input[name='+n+']:checked');return e?e.value:'';};
+  const term=gv('statTerm'),io=gv('statIO'),unit=gv('statPeriod');
+  const unitLbl={month:'월별',quarter:'분기',half:'반기',year:'연간'}[unit]||unit;
+  const phEl=document.getElementById('statsPrintHead');if(phEl)phEl.textContent='접안 스케줄 지연 통계 — 대상: '+term+' · 입·출항: '+io+' · 기간: '+unitLbl+' (출력일 '+nowStr()+')';
+  let rows=load();
+  if(term&&term!=='BPT')rows=rows.filter(r=>r.terminal===term);
+  if(io&&io!=='전체')rows=rows.filter(r=>r.io===io);
+  const el=id=>document.getElementById(id),setT=(id,v)=>{const e=el(id);if(e)e.textContent=v;};
+  const cnt=rows.length,tot=rows.reduce((s,r)=>s+r.delayH,0),avg=cnt?Math.round(tot/cnt*10)/10:0;
+  setT('st-cnt',cnt);setT('st-tot',tot);setT('st-avg',avg);
+  const pm={};rows.forEach(r=>{const k=periodKey(r,unit);if(!pm[k])pm[k]={h:0,c:0,o:periodOrd(r,unit)};pm[k].h+=r.delayH;pm[k].c++;});
+  const pk=Object.keys(pm).sort((a,b)=>pm[a].o-pm[b].o);
+  setT('st-max',pk.length?pk.reduce((a,b)=>pm[a].h>=pm[b].h?a:b):'-');
+  let ph='<tr><th>기간</th><th>지연시간(h)</th><th>발생건수(척)</th></tr>';
+  if(!pk.length)ph+='<tr><td colspan="3" style="color:#8d99ae">자료 없음</td></tr>';
+  pk.forEach(k=>{ph+=`<tr class="data"><td>${k}</td><td><b>${pm[k].h}</b></td><td>${pm[k].c}</td></tr>`;});
+  ph+=`<tr class="bpt"><td>합계</td><td>${tot}</td><td>${cnt}</td></tr>`;
+  const pt=el('scPeriodTable');if(pt)pt.innerHTML=ph;
+  const rm={};rows.forEach(r=>{const k=catR(r.reason);if(!rm[k])rm[k]={h:0,c:0};rm[k].h+=r.delayH;rm[k].c++;});
+  const rk=Object.keys(rm).sort((a,b)=>rm[b].h-rm[a].h);
+  svgBar(el('scReasonH'),rk.map((k,i)=>({l:k,v:rm[k].h,col:PIE[i%6]})));
+  svgPie(el('scReasonPie'),rk.map(k=>({l:k,v:rm[k].c})));
+  const all=load();
+  svgStack(el('scTermIO'),['신선대','감만'].map(tm=>({l:tm,
+    in:all.filter(r=>r.terminal===tm&&r.io==='입항').reduce((s,r)=>s+r.delayH,0),
+    out:all.filter(r=>r.terminal===tm&&r.io==='출항').reduce((s,r)=>s+r.delayH,0)})));
+  const ai=all.filter(r=>r.io==='입항').reduce((s,r)=>s+r.delayH,0),ao=all.filter(r=>r.io==='출항').reduce((s,r)=>s+r.delayH,0);
+  svgBar(el('scIO'),[{l:'입항',v:ai,col:'#a7c8ec'},{l:'출항',v:ao,col:'#f3cf9c'}]);
+}
+function buildDocHtml(r){
+  return `<div class="doc">
+    <div class="dtitle">접안 스케줄 지연사유서</div>
+    <div class="dmeta"><span>문서번호 : ${esc(r.docNo)||'-'}</span><span>작성일 : ${r.docDate||''}</span></div>
+    <table class="dtab">
+      <tr><th>터미널</th><td>${r.terminal}</td><th>입 / 출항</th><td>${r.io}</td></tr>
+      <tr><th>모선명</th><td>${esc(r.vessel)||'&nbsp;'}</td><th>관리년월</th><td>${r.ym||''}</td></tr>
+      <tr><th>기존 입출항시간</th><td>${fmt(r.planned)||'&nbsp;'}</td><th>변경 입출항시간</th><td>${fmt(r.changed)||'&nbsp;'}</td></tr>
+      <tr><th>지연시간</th><td colspan="3"><b>${r.delayH||'0'} 시간</b></td></tr>
+    </table>
+    <div class="reasonlbl">지 연 사 유</div>
+    <div class="reasonbox">${esc(r.reasonDetail||r.reason)||'&nbsp;'}</div>
+    <div class="closing">상기와 같이 접안 스케줄 지연이 발생하였음을 보고합니다.</div>
+    <div class="sign">작 성 자 : ${esc(r.writer)||'________________'} &nbsp;&nbsp;(인)<br>확 인 자 : ${esc(r.checker)||'________________'} &nbsp;&nbsp;(인)</div>
+  </div>`;
+}
+function printDoc(){if(!document.getElementById('docPick').value){toast('저장 자료를 선택하세요');return;}window.print();}  /* 개별 출력 — A4 가로 */
+function editDoc(){const id=document.getElementById('docPick').value;if(!id){toast('먼저 자료를 선택하세요');return;}editRec(id);}
+function delDoc(){const id=document.getElementById('docPick').value;if(!id){toast('먼저 자료를 선택하세요');return;}if(!confirm('이 지연 자료를 삭제하시겠습니까?'))return;save(load().filter(x=>x.id!==id));toast('삭제되었습니다');go('home');}
+
+/* 엑셀 예시 데이터 (원본 스케줄 지연 시트 15건, 2024-07) */
+const SAMPLE=[['감만','출항','KRXN-13','2024-07-06T21:00','2024-07-06T22:00','도선 원웨이'],['감만','출항','SPTY-26','2024-07-09T06:00','2024-07-09T10:00','안개 및 강풍으로 중단'],['감만','출항','W293-05','2024-07-17T11:00','2024-07-17T14:00','안개로 도선 중단'],['감만','입항','W292-07','2024-07-03T03:00','2024-07-03T16:00','강풍으로 입항 도선 중단'],['감만','입항','W522-05','2024-07-10T01:00','2024-07-10T07:00','안개로 입항 중단'],['감만','입항','EAHO-24','2024-07-10T08:00','2024-07-10T14:00','강풍으로 도선 중단'],['감만','입항','JIPG-15','2024-07-28T07:00','2024-07-28T13:00','사고로 인한 VTS에서 입출항 중단'],['신선대','출항','KSDY-09','2024-07-10T08:00','2024-07-10T10:00','강풍으로 도선중단'],['신선대','출항','HASR-16','2024-07-10T08:00','2024-07-10T13:00','강풍으로 작업 중단'],['신선대','출항','PCNB-24','2024-07-17T11:00','2024-07-17T12:00','안개로 도선 중단'],['신선대','입항','SWMM-07','2024-07-03T20:00','2024-07-04T02:00','안개로 도선 중단'],['신선대','입항','KKDL-01','2024-07-05T08:00','2024-07-05T09:00','강풍으로 입항 도선 중단'],['신선대','입항','ORBT-11','2024-07-07T21:00','2024-07-09T08:00','안개로 도선 중단'],['신선대','입항','SKNT-21','2024-07-10T09:00','2024-07-10T11:00','강풍으로 도선 중단'],['신선대','입항','SKJD-14','2024-07-10T09:00','2024-07-10T14:00','강풍으로 작업 중단']];
+function seedSample(){const a=load();SAMPLE.forEach((s,i)=>a.push({id:uid(),ym:'2024-07',terminal:s[0],io:s[1],vessel:s[2],planned:s[3],changed:s[4],delayH:hoursBetween(s[3],s[4]),reason:s[5],docNo:'지연-2024-07-'+String(i+1).padStart(3,'0'),docDate:'',writer:'',checker:'',reasonDetail:s[5]}));save(a);}
+function loadSample(){seedSample();refreshHome();toast('엑셀 예시 15건을 불러왔습니다');}
+
+/* 시작 — 최초 실행 시 엑셀 예시 자동 로딩 (저장소 없어도 안전) */
+const firstRun=STORE_OK?(function(){try{return localStorage.getItem(KEY)===null;}catch(e){return true;}})():(MEM.length===0);
+if(firstRun){seedSample();}
+refreshHome();renderChips();reasonPH();
+</script>
+</body>
+</html>
